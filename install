@@ -210,7 +210,7 @@ configure_chroot() {
 
     chroot_enable_multilib() {
       sed -i "/^#\[multilib\]/,/^#Include/s/^#//" /etc/pacman.conf
-      pacman -Sy --noconfir
+      pacman -Sy --noconfirm
     }
     chroot_configure_locale() {
       grep -qxF "$LOCALE UTF-8" /etc/locale.gen || echo "$LOCALE UTF-8" >> /etc/locale.gen

@@ -193,65 +193,6 @@ generate_fstab() {
   genfstab -U /mnt > /mnt/etc/fstab
 }
 
-chroot_enable_multilib() {
-  sed -i '/^#\[multilib\]/,/^#Include/s/^#//' /etc/pacman.conf
-}
-
-chroot_configure_locale() {
-  grep -qxF "$LOCALE UTF-8" /etc/locale.gen || echo "$LOCALE UTF-8" >> /etc/locale.gen
-  locale-gen
-  echo "LANG=$LOCALE" > /etc/locale.conf
-  echo 'KEYMAP=us'    > /etc/vconsole.conf
-}
-
-chroot_configure_timezone() {
-  ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
-  hwclock --systohc
-}
-
-chroot_configure_hostname() {
-  echo "$HOSTNAME" > /etc/hostname
-  cat > /etc/hosts <<HOSTS
-127.0.0.1   localhost
-::1         localhost
-127.0.1.1   $HOSTNAME.localdomain $HOSTNAME
-HOSTS
-}
-
-chroot_enable_services() {
-  systemctl enable dhcpcd
-  systemctl enable sshd
-}
-
-chroot_create_user() {
-  useradd -m -G wheel -s /bin/bash "$USERNAME"
-  echo '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
-  chmod 0440 /etc/sudoers.d/wheel
-
-  printf 'root:%s\n'           "$PW_HASH" | chpasswd -e
-  printf '%s:%s\n' "$USERNAME" "$PW_HASH" | chpasswd -e
-}
-
-chroot_configure_bootloader() {
-  local root_uuid boot_nums
-
-  while read -r bootnum; do
-    efibootmgr -b "$bootnum" -B
-  done < <(efibootmgr -v 2>/dev/null | awk '/Arch Speed Meta/ {for(i=1;i<=NF;i++) if($i ~ /^Boot[0-9A-Fa-f]{4}[*]?$/) {gsub(/[*]/,"",$i); gsub(/Boot/,"",$i); print}}')
-
-  root_uuid=$(blkid -s UUID -o value "${PART}2")
-  [[ -n "$root_uuid" ]] || { echo "ERROR: Could not determine root partition UUID." >&2; exit 1; }
-
-  local ucode_initrd=""
-  [[ -n "$UCODE" ]] && ucode_initrd="initrd=/${UCODE}.img "
-
-  [[ -f /boot/initramfs-linux.img ]] || { echo "ERROR: initramfs not found." >&2; exit 1; }
-
-  efibootmgr --create --disk "$DISK" --part 1 --label "Arch Speed Meta" \
-    --loader /vmlinuz-linux \
-    --unicode "root=UUID=${root_uuid} rw ${ucode_initrd}initrd=/initramfs-linux.img quiet loglevel=3 nowatchdog nmi_watchdog=0 rd.luks=0 rd.lvm=0" --verbose
-}
-
 configure_chroot() {
   printf '%s\n' "$PW_HASH" > /mnt/root/.pwhash
   chmod 600 /mnt/root/.pwhash
@@ -266,6 +207,57 @@ configure_chroot() {
     UCODE="$UCODE" \
     /bin/bash -c '
     set -euo pipefail
+
+    chroot_enable_multilib() {
+      sed -i "/^#\[multilib\]/,/^#Include/s/^#//" /etc/pacman.conf
+    }
+    chroot_configure_locale() {
+      grep -qxF "$LOCALE UTF-8" /etc/locale.gen || echo "$LOCALE UTF-8" >> /etc/locale.gen
+      locale-gen
+      echo "LANG=$LOCALE" > /etc/locale.conf
+      echo "KEYMAP=us"    > /etc/vconsole.conf
+    }
+    chroot_configure_timezone() {
+      ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+      hwclock --systohc
+    }
+    chroot_configure_hostname() {
+      echo "$HOSTNAME" > /etc/hostname
+      cat > /etc/hosts <<HOSTS
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $HOSTNAME.localdomain $HOSTNAME
+HOSTS
+    }
+    chroot_enable_services() {
+      systemctl enable dhcpcd
+      systemctl enable sshd
+    }
+    chroot_create_user() {
+      useradd -m -G wheel -s /bin/bash "$USERNAME"
+      echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel
+      chmod 0440 /etc/sudoers.d/wheel
+      printf "root:%s\n"           "$PW_HASH" | chpasswd -e
+      printf "%s:%s\n" "$USERNAME" "$PW_HASH" | chpasswd -e
+    }
+    chroot_configure_bootloader() {
+      local root_uuid
+      while read -r bootnum; do
+        efibootmgr -b "$bootnum" -B
+      done < <(efibootmgr -v 2>/dev/null | awk "/Arch Speed Meta/ {for(i=1;i<=NF;i++) if(\$i ~ /^Boot[0-9A-Fa-f]{4}[*]?\$/) {gsub(/[*]/,\"\",\$i); gsub(/Boot/,\"\",\$i); print}}")
+
+      root_uuid=$(blkid -s UUID -o value "${PART}2")
+      [[ -n "$root_uuid" ]] || { echo "ERROR: Could not determine root partition UUID." >&2; exit 1; }
+
+      local ucode_initrd=""
+      [[ -n "$UCODE" ]] && ucode_initrd="initrd=/${UCODE}.img "
+
+      [[ -f /boot/initramfs-linux.img ]] || { echo "ERROR: initramfs not found." >&2; exit 1; }
+
+      efibootmgr --create --disk "$DISK" --part 1 --label "Arch Speed Meta" \
+        --loader /vmlinuz-linux \
+        --unicode "root=UUID=${root_uuid} rw ${ucode_initrd}initrd=/initramfs-linux.img quiet loglevel=3 nowatchdog nmi_watchdog=0 rd.luks=0 rd.lvm=0" --verbose
+    }
 
     PW_HASH=$(cat /root/.pwhash)
     shred -u /root/.pwhash
@@ -336,4 +328,4 @@ main() {
   prompt_reboot
 }
 
-main "$@"%                      
+main "$@"%                               

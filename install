@@ -176,6 +176,11 @@ mount_partitions() {
   mount -L home       /mnt/home
 }
 
+create_vconsole() {
+  mkdir -p /mnt/etc
+  echo "KEYMAP=us" > /mnt/etc/vconsole.conf
+}
+
 install_base() {
   local pkgs=(
     base base-devel
@@ -322,6 +327,7 @@ main() {
   partition_disk
   format_partitions
   mount_partitions
+  create_vconsole
   install_base
   generate_fstab
   configure_chroot
@@ -329,4 +335,4 @@ main() {
   prompt_reboot
 }
 
-main "$@"%                               
+main "$@"%                         

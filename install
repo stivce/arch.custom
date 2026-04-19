@@ -4,6 +4,19 @@ set -euo pipefail
 readonly LOCALE="en_US.UTF-8"
 readonly HOSTNAME="arch-meta"
 readonly TIMEZONE="Europe/Vienna"
+readonly NR_CPUS="13"
+
+PACKAGES=(
+  base base-devel
+  linux linux-headers linux-firmware
+  efibootmgr
+  dhcpcd
+  networkmanager
+  openssh
+  sudo python git ansible neovim
+)
+
+SERVICES=(NetworkManager sshd)
 
 USERNAME=""
 PW_HASH=""
@@ -182,14 +195,7 @@ create_vconsole() {
 }
 
 install_base() {
-  local pkgs=(
-    base base-devel
-    linux linux-headers linux-firmware
-    efibootmgr
-    dhcpcd
-    openssh
-    sudo python git ansible neovim
-  )
+  local pkgs=("${PACKAGES[@]}")
   [[ -n "$UCODE" ]] && pkgs+=("$UCODE")
   pacstrap /mnt "${pkgs[@]}"
 }
@@ -210,6 +216,7 @@ configure_chroot() {
     DISK="$DISK" \
     PART="$PART" \
     UCODE="$UCODE" \
+    NR_CPUS="$NR_CPUS" \
     /bin/bash -c '
     set -euo pipefail
 
@@ -236,8 +243,9 @@ configure_chroot() {
 HOSTS
     }
     chroot_enable_services() {
-      systemctl enable dhcpcd
-      systemctl enable sshd
+      for svc in "${SERVICES[@]}"; do
+        systemctl enable "$svc"
+      done
     }
     chroot_create_user() {
       useradd -m -G wheel -s /bin/bash "$USERNAME"
@@ -260,9 +268,12 @@ HOSTS
 
       [[ -f /boot/initramfs-linux.img ]] || { echo "ERROR: initramfs not found." >&2; exit 1; }
 
+      local nr_cpus_param=""
+      [[ -n "$NR_CPUS" ]] && nr_cpus_param="nr_cpus=$NR_CPUS "
+
       efibootmgr --create --disk "$DISK" --part 1 --label "Arch Speed Meta" \
         --loader /vmlinuz-linux \
-        --unicode "root=UUID=${root_uuid} rw ${ucode_initrd}initrd=/initramfs-linux.img quiet loglevel=3 nowatchdog nmi_watchdog=0 rd.luks=0 rd.lvm=0" --verbose
+        --unicode "root=UUID=${root_uuid} rw ${ucode_initrd}initrd=/initramfs-linux.img quiet loglevel=3 nowatchdog nmi_watchdog=0 rd.luks=0 rd.lvm=0 ${nr_cpus_param}acpi=lax" --verbose
     }
 
     PW_HASH=$(cat /root/.pwhash)
@@ -285,27 +296,29 @@ show_summary() {
   part2_size=$(lsblk -dno SIZE "${PART}2" 2>/dev/null)
   part3_size=$(lsblk -dno SIZE "${PART}3" 2>/dev/null)
   clear
+  local services_list
+  services_list=$(IFS=,; echo "${SERVICES[*]}")
   cat <<SUMMARY
-══════════════════════════════════════════════════════════════════════════════
-  Arch Linux Installation Complete
-══════════════════════════════════════════════════════════════════════════════
+  ══════════════════════════════════════════════════════════════════════════════
+    Arch Linux Installation Complete
+  ══════════════════════════════════════════════════════════════════════════════
 
-  Hostname:   $HOSTNAME
-  Username:   $USERNAME
-  Locale:     $LOCALE
-  Timezone:   $TIMEZONE
-  Packages:   $pkg_count
+    Hostname:   $HOSTNAME
+    Username:   $USERNAME
+    Locale:     $LOCALE
+    Timezone:   $TIMEZONE
+    Packages:   $pkg_count
 
-  Disk:       $DISK
-    ${PART}1  EFI_SYSTEM  ${part1_size}   /boot
-    ${PART}2  ROOT        ${part2_size}   /
-    ${PART}3  HOME        ${part3_size}   /home
+    Disk:       $DISK
+      ${PART}1  EFI_SYSTEM  ${part1_size}   /boot
+      ${PART}2  ROOT        ${part2_size}   /
+      ${PART}3  HOME        ${part3_size}   /home
 
-  Services:   dhcpcd, sshd
-  Bootloader: EFISTUB (linux)
-  Microcode:  ${UCODE:-none}
+    Services:   $services_list
+    Bootloader: EFISTUB (linux)
+    Microcode:  ${UCODE:-none}  
 
-══════════════════════════════════════════════════════════════════════════════
+  ══════════════════════════════════════════════════════════════════════════════
 SUMMARY
 }
 

@@ -191,7 +191,7 @@ mount_partitions() {
 
 create_vconsole() {
   mkdir -p /mnt/etc
-  echo "KEYMAP=us" > /mnt/etc/vconsole.conf
+  echo "KEYMAP=at" > /mnt/etc/vconsole.conf
 }
 
 install_base() {
@@ -228,7 +228,7 @@ configure_chroot() {
       grep -qxF "$LOCALE UTF-8" /etc/locale.gen || echo "$LOCALE UTF-8" >> /etc/locale.gen
       locale-gen
       echo "LANG=$LOCALE" > /etc/locale.conf
-      echo "KEYMAP=us"    > /etc/vconsole.conf
+      echo "KEYMAP=at"    > /etc/vconsole.conf
     }
     chroot_configure_timezone() {
       ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime

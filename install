@@ -221,6 +221,7 @@ configure_chroot() {
     PART="$PART" \
     UCODE="$UCODE" \
     NR_CPUS="$NR_CPUS" \
+    SERVICES="${SERVICES[*]}" \
     /bin/bash -c '
     set -euo pipefail
 
@@ -246,10 +247,10 @@ configure_chroot() {
 127.0.1.1   $HOSTNAME.localdomain $HOSTNAME
 HOSTS
     }
+    read -ra SERVICES_ARR <<< "$SERVICES"
     chroot_enable_services() {
-      for svc in "${SERVICES[@]}"; do
+      for svc in "${SERVICES_ARR[@]}"; do
         systemctl enable "$svc"
-        systemctl start "$svc"
       done
     }
     chroot_create_user() {

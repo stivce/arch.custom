@@ -8,12 +8,16 @@ readonly NR_CPUS="13"
 
 PACKAGES=(
   base base-devel
-  linux linux-headers linux-firmware
+  linux 
+  linux-headers 
+  linux-firmware
   efibootmgr
-  dhcpcd
   networkmanager
   openssh
-  sudo python git ansible neovim
+  sudo 
+  git 
+  ansible 
+  neovim
 )
 
 SERVICES=(NetworkManager sshd)

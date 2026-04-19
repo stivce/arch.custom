@@ -245,6 +245,7 @@ HOSTS
     chroot_enable_services() {
       for svc in "${SERVICES[@]}"; do
         systemctl enable "$svc"
+        systemctl start "$svc"
       done
     }
     chroot_create_user() {

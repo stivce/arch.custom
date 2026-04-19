@@ -4,7 +4,6 @@ set -euo pipefail
 readonly LOCALE="en_US.UTF-8"
 readonly HOSTNAME="arch-meta"
 readonly TIMEZONE="Europe/Vienna"
-readonly NR_CPUS="13"
 
 PACKAGES=(
   base base-devel
@@ -220,7 +219,6 @@ configure_chroot() {
     DISK="$DISK" \
     PART="$PART" \
     UCODE="$UCODE" \
-    NR_CPUS="$NR_CPUS" \
     SERVICES="${SERVICES[*]}" \
     /bin/bash -c '
     set -euo pipefail
